@@ -8,8 +8,7 @@
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
     <PropertyGroup>
-        <Description>High-performance library for working with the minecraft protocol</Description>
-        
+        <Description>High-performance library for working with the minecraft protocol</Description>        
     </PropertyGroup>
     <ItemGroup>
         <InternalsVisibleTo Include="McProtoNet.Benchmark"/>

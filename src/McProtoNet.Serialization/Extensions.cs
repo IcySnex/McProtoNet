@@ -174,6 +174,7 @@ public static class Extensions
     /// <param name="token">Cancellation token</param>
     /// <returns>The decoded VarInt value</returns>
     /// <exception cref="InvalidOperationException">Thrown when VarInt is too big</exception>
+    //[AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
     public static async ValueTask<int> ReadVarIntAsync(this Stream stream, CancellationToken token = default)
     {
         var buff = ArrayPool<byte>.Shared.Rent(1);

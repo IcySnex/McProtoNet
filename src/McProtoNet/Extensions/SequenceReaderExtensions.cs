@@ -38,12 +38,12 @@ public static class SequenceReaderExtensions
 
     public static bool TryReadString(this ref SequenceReader<byte> reader, out string value)
     {
+        
         reader.TryReadVarInt(out var len, out _);
 
-        value = Encoding.UTF8.GetString(reader.UnreadSequence.Slice(0, len).ToArray());
+        var data = reader.UnreadSequence.Slice(0, len);
 
-        reader.Advance(len);
-
+        value = Encoding.UTF8.GetString(data);
         return true;
     }
 }

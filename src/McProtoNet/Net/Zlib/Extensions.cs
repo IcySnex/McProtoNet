@@ -28,7 +28,7 @@ internal static class Extensions
             }
             else
             {
-                MemoryOwner<byte> tempBuffer = s_allocator.AllocateExactly((int)compressedSequence.Length);
+                var tempBuffer = s_allocator.AllocateExactly((int)compressedSequence.Length);
 
                 try
                 {

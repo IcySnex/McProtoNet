@@ -24,7 +24,7 @@ internal sealed class MinecraftPacketPipeReader
     public int CompressionThreshold { get; set; }
 
 
-    public async IAsyncEnumerable<InputPacket> ReadPacketsAsync(
+    public async IAsyncEnumerable<NewInputPacket> ReadPacketsAsync(
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var chunkcount = 0;
@@ -75,8 +75,7 @@ internal sealed class MinecraftPacketPipeReader
 
         if (buffer.Length < 1) return false; // Недостаточно данных для чтения заголовка пакета
 
-        int length;
-        if (!reader.TryReadVarInt(out length, out _)) return false; // Невозможно прочитать длину заголовка
+        if (!reader.TryReadVarInt(out var length, out _)) return false; // Невозможно прочитать длину заголовка
 
 
         if (length > reader.Remaining) return false; // Недостаточно данных для чтения полного пакета
@@ -93,23 +92,59 @@ internal sealed class MinecraftPacketPipeReader
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private InputPacket Decompress(in ReadOnlySequence<byte> data)
+    private NewInputPacket Decompress(in ReadOnlySequence<byte> data)
     {
         if (CompressionThreshold == -1)
         {
-            throw new NotImplementedException();
-            //return new InputPacket(data);
+            //Без сжатия
+            return new NewInputPacket(data);
         }
 
         data.TryReadVarInt(out var sizeUncompressed, out var len);
 
         if (sizeUncompressed == 0)
         {
-            throw new NotImplementedException();
-            //return new InputPacket(data.Slice(1));
+            // Со сжатием, короткий пакет
+            return new NewInputPacket(data.Slice(1));
+           
         }
 
+        // Со сжатием, длинный пакет
+        return new NewInputPacket(data.Slice(len).Decompress(sizeUncompressed));
+    }
+}
 
-        return new InputPacket(data.Slice(len).Decompress(sizeUncompressed));
+public struct NewInputPacket : IDisposable
+{
+    public readonly int Id;
+    public readonly ReadOnlySequence<byte> Data;
+
+    private readonly MemoryOwner<byte>? _memoryOwner;
+
+    public NewInputPacket(ReadOnlySequence<byte> data)
+    {
+        data.TryReadVarInt(out var value, out var offset);
+        Id = value;
+        Data = data.Slice(offset);
+    }
+
+    
+
+    /// <summary>
+    /// Constructor for compressed packet
+    /// </summary>
+    /// <param name="owner"></param>
+    public NewInputPacket(MemoryOwner<byte> owner)
+    {
+        _memoryOwner = owner;
+        var data = new ReadOnlySequence<byte>(owner.Memory);
+        data.TryReadVarInt(out var value, out var offset);
+        Id = value;
+        Data = data.Slice(offset);
+    }
+
+    public void Dispose()
+    {
+        _memoryOwner?.Dispose();
     }
 }

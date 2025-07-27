@@ -1,5 +1,6 @@
 ﻿using System.Buffers;
 using System.Runtime.CompilerServices;
+using System.Text;
 using Cysharp.Text;
 
 namespace McProtoNet;
@@ -24,6 +25,7 @@ public static class ReadonlySequenceExtensions
         var builder = ZString.CreateUtf8StringBuilder();
         try
         {
+            
             builder.Write(reader.UnreadSequence);
 
 
