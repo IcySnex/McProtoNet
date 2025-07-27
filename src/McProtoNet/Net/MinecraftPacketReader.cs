@@ -1,5 +1,6 @@
 ﻿using System.Buffers;
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using DotNext.Buffers;
 using McProtoNet.Abstractions;
 using McProtoNet.Net.Zlib;
@@ -31,71 +32,113 @@ public sealed class MinecraftPacketReader
     /// <returns>The read packet data</returns>
     /// <exception cref="Exception">Thrown when decompression fails or packet size is invalid</exception>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    //[AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
     public async ValueTask<InputPacket> ReadNextPacketAsync(CancellationToken token = default)
     {
         var len = await BaseStream.ReadVarIntAsync(token);
-        if (_compressionThreshold < 0)
+
+        var buffer = memoryAllocator.AllocateExactly(len);
+        try
         {
-            var buffer = memoryAllocator.AllocateExactly(len);
+            await BaseStream.ReadExactlyAsync(buffer.Memory, token);
+
+            if (_compressionThreshold < 0)
+            {
+                return new InputPacket(buffer);
+            }
+
+            var sizeUncompressed = buffer.Span.ReadVarInt(out var offsetSizeUncompressed);
+
+            if (sizeUncompressed <= 0) return new InputPacket(buffer, offset: offsetSizeUncompressed);
+            
+            
+            var memoryOwner = memoryAllocator.AllocateExactly(sizeUncompressed);
             try
             {
-                await BaseStream.ReadExactlyAsync(buffer.Memory, token);
-                return new InputPacket(buffer);
+                DecompressCore(buffer.Span[offsetSizeUncompressed..], memoryOwner.Span);
+
+                return new InputPacket(memoryOwner);
             }
             catch
             {
-                buffer.Dispose();
+                memoryOwner.Dispose();
                 throw;
-            }
-        }
-
-        var sizeUncompressed = await BaseStream.ReadVarIntAsync(token);
-        if (sizeUncompressed > 0)
-        {
-            if (sizeUncompressed < _compressionThreshold)
-                throw new Exception(
-                    $"Длина sizeUncompressed меньше порога сжатия. sizeUncompressed: {sizeUncompressed} Порог: {_compressionThreshold}");
-            len -= sizeUncompressed.GetVarIntLength();
-
-            var compressedBuffer = memoryAllocator.AllocateExactly(len);
-
-            try
-            {
-                await BaseStream.ReadExactlyAsync(compressedBuffer.Memory, token);
-                var memoryOwner = memoryAllocator.AllocateExactly(sizeUncompressed);
-                try
-                {
-                    DecompressCore(compressedBuffer.Span, memoryOwner.Span);
-                    return new InputPacket(memoryOwner);
-                }
-                catch
-                {
-                    memoryOwner.Dispose();
-                    throw;
-                }
             }
             finally
             {
-                compressedBuffer.Dispose();
-            }
-        }
-
-        {
-            if (sizeUncompressed != 0)
-                throw new Exception("size incorrect");
-
-            var buffer = memoryAllocator.AllocateExactly(len - 1); // -1 is sizeUncompressed length !!!
-            try
-            {
-                await BaseStream.ReadExactlyAsync(buffer.Memory, token);
-                return new InputPacket(buffer);
-            }
-            catch
-            {
                 buffer.Dispose();
-                throw;
             }
+
         }
+        catch
+        {
+            buffer.Dispose();
+            throw;
+        }
+
+        // var len = await BaseStream.ReadVarIntAsync(token);
+        // if (_compressionThreshold < 0)
+        // {
+        //     var buffer = memoryAllocator.AllocateExactly(len);
+        //     try
+        //     {
+        //         await BaseStream.ReadExactlyAsync(buffer.Memory, token);
+        //         return new InputPacket(buffer);
+        //     }
+        //     catch
+        //     {
+        //         buffer.Dispose();
+        //         throw;
+        //     }
+        // }
+        //
+        // var sizeUncompressed = await BaseStream.ReadVarIntAsync(token);
+        // if (sizeUncompressed > 0)
+        // {
+        //     if (sizeUncompressed < _compressionThreshold)
+        //         throw new Exception(
+        //             $"Длина sizeUncompressed меньше порога сжатия. sizeUncompressed: {sizeUncompressed} Порог: {_compressionThreshold}");
+        //     len -= sizeUncompressed.GetVarIntLength();
+        //
+        //     var compressedBuffer = memoryAllocator.AllocateExactly(len);
+        //
+        //     try
+        //     {
+        //         await BaseStream.ReadExactlyAsync(compressedBuffer.Memory, token);
+        //         var memoryOwner = memoryAllocator.AllocateExactly(sizeUncompressed);
+        //         try
+        //         {
+        //             DecompressCore(compressedBuffer.Span, memoryOwner.Span);
+        //             return new InputPacket(memoryOwner);
+        //         }
+        //         catch
+        //         {
+        //             memoryOwner.Dispose();
+        //             throw;
+        //         }
+        //     }
+        //     finally
+        //     {
+        //         compressedBuffer.Dispose();
+        //     }
+        // }
+        //
+        // {
+        //     if (sizeUncompressed != 0)
+        //         throw new Exception("size incorrect");
+        //
+        //     var buffer = memoryAllocator.AllocateExactly(len - 1); // -1 is sizeUncompressed length !!!
+        //     try
+        //     {
+        //         await BaseStream.ReadExactlyAsync(buffer.Memory, token);
+        //         return new InputPacket(buffer);
+        //     }
+        //     catch
+        //     {
+        //         buffer.Dispose();
+        //         throw;
+        //     }
+        // }
     }
 
     /// <summary>
