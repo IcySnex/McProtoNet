@@ -2,6 +2,7 @@
 using System.Buffers;
 using System.IO;
 using System.IO.Pipelines;
+using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
@@ -19,7 +20,7 @@ public class ReadBenchmarks
 {
     [Params(1_000_000)] public int PacketsCount;
 
-    [Params(-1, 128)] public int CompressionThreshold;
+    public int CompressionThreshold = 128;
 
 
     private static readonly Random Rand = new Random(53);
@@ -53,78 +54,92 @@ public class ReadBenchmarks
         return writer.GetWrittenMemory();
     }
 
-    private Stream _mainStream;
+    private TcpClient _client;
+    private Stream _stream;
 
     [GlobalSetup]
     public async Task Setup()
     {
-        MemoryStream ms = new MemoryStream();
-        _mainStream = ms;
-        Random r = new Random(73);
-        var writer = new MinecraftPacketSender();
+        // string tempFileName = Path.GetTempFileName();
+        // _mainStream = File.OpenWrite(tempFileName);
+        // Random r = new Random(73);
+        // var writer = new MinecraftPacketSender();
+        //
+        // writer.SwitchCompression(CompressionThreshold);
+        //
+        // writer.BaseStream = _mainStream;
+        //
+        // for (int i = 0; i < PacketsCount; i++)
+        // {
+        //     var buffer = GeneratePacket();
+        //
+        //     var packet = new OutputPacket(buffer);
+        //
+        //     await writer.SendAndDisposeAsync(packet, CancellationToken.None);
+        // }
+        // _mainStream.Close();
+        // _mainStream = File.OpenRead(tempFileName);
+    }
 
-        writer.SwitchCompression(CompressionThreshold);
+    [IterationSetup]
+    public async Task IterationSetup()
+    {
+        _client = new TcpClient();
+        await _client.ConnectAsync("127.0.0.1", 6060);
+        _stream = _client.GetStream();
+    }
 
-        var allocator = ArrayPool<byte>.Shared.ToAllocator();
-
-        writer.BaseStream = ms;
-
-        for (int i = 0; i < PacketsCount; i++)
-        {
-            var buffer = GeneratePacket();
-
-            var packet = new OutputPacket(buffer);
-
-            await writer.SendAndDisposeAsync(packet, CancellationToken.None);
-        }
+    [IterationCleanup]
+    public void IterationCleanup()
+    {
+        _stream.Dispose();
+        _client.Dispose();
     }
 
     [GlobalCleanup]
     public void Cleanup()
     {
+        // _mainStream.Close();
+        // File.Delete(_mainStream.Name);
+        // _client.Close();
     }
 
 
-    [Benchmark]
+    //[Benchmark]
     public async Task ReadPacketsStreaming()
     {
-        _mainStream.Position = 0;
+        
         var reader = new MinecraftPacketReader();
         reader.SwitchCompression(CompressionThreshold);
-        reader.BaseStream = _mainStream;
+        reader.BaseStream = _stream;
         TestPacket packet1 = new TestPacket();
         for (var i = 0; i < PacketsCount; i++)
         {
             using var packet = await reader.ReadNextPacketAsync();
 
-            // if (packet.Id != 53)
-            // {
-            //     throw new Exception($"Packet id fail: {packet.Id}");
-            // }
-
-            var parser = new MinecraftPrimitiveReader(packet.Data);
-
-            packet1.Deserialize(ref parser);
-
-            //CheckPacket(packet1);
+            ReadPacket(packet, packet1);
         }
     }
 
-    private void CheckPacket(TestPacket packet)
+    private static void CheckPacket(TestPacket packet)
     {
-        if (packet.EntityId != 1 || packet.DX != 2 || packet.DY != 3 || packet.DZ != 4 || packet.Yaw != 5 ||
-            packet.Pitch != 6 || packet.OnGround != true)
+        if (packet.EntityId != 1
+            || packet.DX != 2
+            || packet.DY != 3
+            || packet.DZ != 4
+            || packet.Yaw != 5
+            || packet.Pitch != 6
+            || packet.OnGround != true)
         {
-            throw new Exception(
-                $"Packet is not as expected. EntityId: {packet.EntityId}, DX: {packet.DX}, DY: {packet.DY}, DZ: {packet.DZ}, Yaw: {packet.Yaw}, Pitch: {packet.Pitch}, OnGround: {packet.OnGround}");
+            throw new Exception("Packet data is not correct");
         }
     }
 
     [Benchmark]
     public async Task ReadPacketsWithPipeLines()
     {
-        _mainStream.Position = 0;
-        var reader = new MinecraftPacketPipeReader(PipeReader.Create(_mainStream))
+      
+        var reader = new MinecraftPacketPipeReader(PipeReader.Create(_stream))
         {
             CompressionThreshold = CompressionThreshold
         };
@@ -132,16 +147,10 @@ public class ReadBenchmarks
         TestPacket packet1 = new TestPacket();
         await foreach (var packet in reader.ReadPacketsAsync())
         {
-            // if (packet.Id != 53)
-            // {
-            //     throw new Exception($"Packet id fail: {packet.Id}");
-            // }
 
             ReadPacket(packet, packet1);
-
-            //CheckPacket(packet1);
-
-
+            
+            CheckPacket(packet1);
             packet.Dispose();
             count++;
             if (count == PacketsCount)
@@ -155,13 +164,20 @@ public class ReadBenchmarks
         packet.Deserialize(ref reader);
         return packet;
     }
+    
+    private static TestPacket ReadPacket(InputPacket data, TestPacket packet)
+    {
+        MinecraftPrimitiveReader reader = new (data.Data);
+        packet.Deserialize(ref reader);
+        return packet;
+    }
 }
 
 public class TestPacket
 {
     private int _entityId;
     
-    public string Name { get; set; }
+        public string Name { get; set; }
 
     public int EntityId
     {
@@ -221,7 +237,7 @@ public class TestPacket
 
     public void Serialize(ref MinecraftPrimitiveWriter writer)
     {
-        writer.WriteString(Name);
+        //writer.WriteString(Name);
         writer.WriteVarInt(EntityId);
         writer.WriteSignedShort(DX);
         writer.WriteSignedShort(DY);
@@ -236,7 +252,7 @@ public class TestPacket
 
     public void Deserialize(ref MinecraftPrimitiveReader reader)
     {
-        Name = reader.ReadString();
+        //Name = reader.ReadString();
         EntityId = reader.ReadVarInt();
         DX = reader.ReadSignedShort();
         DY = reader.ReadSignedShort();
@@ -251,21 +267,24 @@ public class TestPacket
     public void Deserialize(ref SequenceReader<byte> reader)
     {
         
-        reader.TryReadString(out var name);
-        Name = name;
-        
-        reader.TryReadVarInt(out _entityId, out _);
-        reader.TryReadBigEndian(out _dx);
-        reader.TryReadBigEndian(out _dy);
-        reader.TryReadBigEndian(out _dz);
-        reader.TryRead(out var yaw);
+        //reader.TryReadString(out var name);
+        //Name = name;
+        bool success = true;
+        success &= reader.TryReadVarInt(out _entityId, out _);
+        success &= reader.TryReadBigEndian(out _dx);
+        success &= reader.TryReadBigEndian(out _dy);
+        success &= reader.TryReadBigEndian(out _dz);
+        success &= reader.TryRead(out var yaw);
         Yaw = (sbyte)yaw;
 
-        reader.TryRead(out var pitch);
+        success &= reader.TryRead(out var pitch);
         Pitch = (sbyte)pitch;
 
-        reader.TryRead(out var onGround);
+        success &= reader.TryRead(out var onGround);
         OnGround = onGround == 1;
+
+        if (!success)
+            throw new EndOfStreamException("Где то Try не сработал");
 
         //reader.TryReadVarInt(out var specialDataLength, out _);
 

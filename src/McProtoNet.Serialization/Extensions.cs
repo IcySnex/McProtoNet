@@ -186,8 +186,8 @@ public static class Extensions
             byte read;
             do
             {
-               await stream.ReadExactlyAsync(buff, 0, 1, token);
-                
+                await stream.ReadExactlyAsync(buff, 0, 1, token);
+
 
                 read = buff[0];
                 var value = read & 0b01111111;
@@ -203,6 +203,28 @@ public static class Extensions
         {
             ArrayPool<byte>.Shared.Return(buff);
         }
+    }
+
+    public static async ValueTask<int> ReadVarIntTestAsync(this Stream stream, byte[] buff,
+        CancellationToken token = default)
+    {
+        var numRead = 0;
+        var result = 0;
+        byte read;
+        do
+        {
+            await stream.ReadExactlyAsync(buff, 0, 1, token);
+
+
+            read = buff[0];
+            var value = read & 0b01111111;
+            result |= value << (7 * numRead);
+
+            numRead++;
+            if (numRead > 5) throw new InvalidOperationException("VarInt is too big");
+        } while ((read & 0b10000000) != 0);
+
+        return result;
     }
 
     /// <summary>

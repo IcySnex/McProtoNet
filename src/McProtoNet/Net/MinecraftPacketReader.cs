@@ -13,7 +13,9 @@ namespace McProtoNet.Net;
 /// </summary>
 public sealed class MinecraftPacketReader
 {
-    private static readonly MemoryAllocator<byte> memoryAllocator = ArrayPool<byte>.Shared.ToAllocator();
+    private readonly byte[] _varIntBuff = new byte[1];
+
+    private static readonly MemoryAllocator<byte> MemoryAllocator = ArrayPool<byte>.Shared.ToAllocator();
 
     /// <summary>
     /// The compression threshold in bytes. Values less than 0 indicate compression is disabled.
@@ -35,9 +37,9 @@ public sealed class MinecraftPacketReader
     //[AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
     public async ValueTask<InputPacket> ReadNextPacketAsync(CancellationToken token = default)
     {
-        var len = await BaseStream.ReadVarIntAsync(token);
+        var len = await BaseStream.ReadVarIntTestAsync(_varIntBuff, token);
 
-        var buffer = memoryAllocator.AllocateExactly(len);
+        var buffer = MemoryAllocator.AllocateExactly(len);
         try
         {
             await BaseStream.ReadExactlyAsync(buffer.Memory, token);
@@ -50,13 +52,13 @@ public sealed class MinecraftPacketReader
             var sizeUncompressed = buffer.Span.ReadVarInt(out var offsetSizeUncompressed);
 
             if (sizeUncompressed <= 0) return new InputPacket(buffer, offset: offsetSizeUncompressed);
-            
-            
-            var memoryOwner = memoryAllocator.AllocateExactly(sizeUncompressed);
+
+
+            var memoryOwner = MemoryAllocator.AllocateExactly(sizeUncompressed);
             try
             {
                 DecompressCore(buffer.Span[offsetSizeUncompressed..], memoryOwner.Span);
-
+                buffer.Dispose();
                 return new InputPacket(memoryOwner);
             }
             catch
@@ -64,11 +66,6 @@ public sealed class MinecraftPacketReader
                 memoryOwner.Dispose();
                 throw;
             }
-            finally
-            {
-                buffer.Dispose();
-            }
-
         }
         catch
         {

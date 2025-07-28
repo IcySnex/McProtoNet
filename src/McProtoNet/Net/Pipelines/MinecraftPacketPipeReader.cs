@@ -13,7 +13,7 @@ namespace McProtoNet.Net;
 internal sealed class MinecraftPacketPipeReader
 {
     private readonly PipeReader pipeReader;
-    private static readonly MemoryAllocator<byte> s_allocator = ArrayPool<byte>.Shared.ToAllocator();
+        //private static readonly MemoryAllocator<byte> s_allocator = ArrayPool<byte>.Shared.ToAllocator();
 
     public MinecraftPacketPipeReader(PipeReader pipeReader)
     {
