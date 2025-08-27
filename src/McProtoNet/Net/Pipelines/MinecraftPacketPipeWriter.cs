@@ -1,5 +1,6 @@
 ﻿using System.Buffers;
 using System.IO.Pipelines;
+using System.Security.Cryptography;
 using McProtoNet.Net.Zlib;
 using McProtoNet.Serialization;
 
@@ -10,9 +11,11 @@ internal sealed class MinecraftPacketPipeWriter
     private static readonly byte[] ZeroVarInt = { 0 };
 
     private readonly PipeWriter pipeWriter;
+    private readonly ICryptoTransform cryptoTransform;
 
     public MinecraftPacketPipeWriter(PipeWriter pipeWriter)
     {
+        
         this.pipeWriter = pipeWriter;
     }
 
@@ -37,6 +40,7 @@ internal sealed class MinecraftPacketPipeWriter
 
             return pipeWriter.WriteAsync(data, cancellationToken);
         }
+        
 
         var uncompressedSize = data.Length;
         using scoped var compressor = new ZlibCompressor();

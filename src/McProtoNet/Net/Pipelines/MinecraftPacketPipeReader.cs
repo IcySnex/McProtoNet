@@ -1,6 +1,7 @@
 ﻿using System.Buffers;
 using System.IO.Pipelines;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using DotNext;
 using DotNext.Buffers;
 using DotNext.IO.Pipelines;
@@ -10,10 +11,44 @@ using LengthFormat = DotNext.IO.LengthFormat;
 
 namespace McProtoNet.Net;
 
+internal sealed class DecryptedPipeReader : PipeReader
+{
+    public override bool TryRead(out ReadResult result)
+    {
+        throw new NotImplementedException();
+    }
+
+    public override ValueTask<ReadResult> ReadAsync(CancellationToken cancellationToken = new CancellationToken())
+    {
+        throw new NotImplementedException();
+    }
+
+    public override void AdvanceTo(SequencePosition consumed)
+    {
+        throw new NotImplementedException();
+    }
+
+    public override void AdvanceTo(SequencePosition consumed, SequencePosition examined)
+    {
+        throw new NotImplementedException();
+    }
+
+    public override void CancelPendingRead()
+    {
+        throw new NotImplementedException();
+    }
+
+    public override void Complete(Exception? exception = null)
+    {
+        throw new NotImplementedException();
+    }
+}
 internal sealed class MinecraftPacketPipeReader
 {
     private readonly PipeReader pipeReader;
-        //private static readonly MemoryAllocator<byte> s_allocator = ArrayPool<byte>.Shared.ToAllocator();
+    //private static readonly MemoryAllocator<byte> s_allocator = ArrayPool<byte>.Shared.ToAllocator();
+
+    private bool isEncrypted;
 
     public MinecraftPacketPipeReader(PipeReader pipeReader)
     {
@@ -46,7 +81,8 @@ internal sealed class MinecraftPacketPipeReader
             if (result.IsCompleted) break;
 
             if (result.IsCanceled) break;
-
+    
+            
 
             try
             {
@@ -61,9 +97,49 @@ internal sealed class MinecraftPacketPipeReader
             }
         }
 
-        await pipeReader.CompleteAsync();
+        await pipeReader.CompleteAsync().ConfigureAwait(false);
     }
 
+    public static Memory<byte> DecryptAES(ReadOnlySequence<byte> buffer, ICryptoTransform decryptor)
+    {
+        // Вычисляем длину данных
+        long totalLength = buffer.Length;
+
+        if (totalLength == 0)
+            return Memory<byte>.Empty;
+
+        // Резервируем буфер для расшифрованных данных
+        byte[] output = ArrayPool<byte>.Shared.Rent((int)totalLength);
+
+        int offset = 0;
+
+        foreach (var segment in buffer)
+        {
+            // TransformBlock работает с массивами
+            offset += decryptor.TransformBlock(
+                segment.Span.ToArray(), // временно создаём массив из сегмента
+                0,
+                segment.Span.Length,
+                output,
+                offset
+            );
+        }
+
+        // В случае последнего блока (TransformFinalBlock) — вызываем отдельно
+        // Для пайплайнов обычно весь блок можно считать финальным
+        byte[] final = decryptor.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+
+        if (final.Length > 0)
+        {
+            Array.Copy(final, 0, output, offset, final.Length);
+            offset += final.Length;
+        }
+
+        // Создаём Memory<byte> только на реально расшифрованные данные
+        var result = new Memory<byte>(output, 0, offset);
+
+        return result;
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool TryReadPacket(ref ReadOnlySequence<byte> buffer, out ReadOnlySequence<byte> packet)
@@ -106,7 +182,6 @@ internal sealed class MinecraftPacketPipeReader
         {
             // Со сжатием, короткий пакет
             return new NewInputPacket(data.Slice(1));
-           
         }
 
         // Со сжатием, длинный пакет
@@ -128,7 +203,6 @@ public struct NewInputPacket : IDisposable
         Data = data.Slice(offset);
     }
 
-    
 
     /// <summary>
     /// Constructor for compressed packet
