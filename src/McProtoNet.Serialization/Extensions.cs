@@ -75,7 +75,7 @@ public static class Extensions
 
         var len = value.GetVarIntLength(data);
 
-        writer.Write(data.Slice(0, len));
+        writer.Write(data[..len]);
     }
 
 
@@ -290,12 +290,13 @@ public static class Extensions
     /// <returns>A ValueTask representing the asynchronous operation</returns>
     public static async ValueTask WriteVarIntAsync(this Stream stream, int value, CancellationToken token = default)
     {
+        ArgumentNullException.ThrowIfNull(stream);
         var data = ArrayPool<byte>.Shared.Rent(5);
         try
         {
             int len = value.GetVarIntLength(data.AsSpan(0, 5));
 
-            await stream.WriteAsync(data.AsMemory(0, len), token);
+            await stream.WriteAsync(data.AsMemory(0, len), token).ConfigureAwait(false);
         }
         finally
         {

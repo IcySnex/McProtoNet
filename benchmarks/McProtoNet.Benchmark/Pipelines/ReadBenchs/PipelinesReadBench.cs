@@ -1,11 +1,12 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.IO.Pipelines;
 using System.Threading.Tasks;
 using McProtoNet.Net;
 
 namespace McProtoNet.Benchmark.Pipelines.ReadBenchs;
 
-public class PipelinesBench : IBench
+public class PipelinesReadBench : IReceiveBench
 {
     private MinecraftPacketPipeReader _reader;
 
@@ -26,12 +27,22 @@ public class PipelinesBench : IBench
     public async Task Run(int packetsCount)
     {
         var count = 0;
-        await foreach (var packet in _reader.ReadPacketsAsync())
+        try
         {
-            packet.Dispose();
-            count++;
-            if (count == packetsCount)
-                break;
+            await foreach (var packet in _reader.ReadPacketsAsync())
+            {
+                packet.Dispose();
+                count++;
+            }
+        }
+        catch (Exception)
+        {
+            // ignored
+        }
+
+        if (count != packetsCount)
+        {
+            Environment.FailFast($"Packets count mismatch {count} != {packetsCount}");
         }
     }
 

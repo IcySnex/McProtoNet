@@ -4,54 +4,48 @@ using System.Net.Sockets;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
 using McProtoNet.Benchmark.Pipelines.ReadBenchs;
-
+using McProtoNet.Benchmark.Pipelines.SendBenchs;
 
 namespace McProtoNet.Benchmark.Pipelines;
 
-public enum BenchType
-{
-    Stream,
-    BufferedStream,
-    Pipelines,
-    Pipelines2
-}
-
 [Config(typeof(AntiVirusFriendlyConfig))]
 [MemoryDiagnoser]
-public class PipelinesBenchmarks
+public class PipelinesSendBenchmarks
 {
     [Params(1_000_000)] public int PacketsCount;
     [Params(-1)] public int CompressionThreshold;
+    [Params(50)] public int PacketSize;
 
     [Params(BenchType.BufferedStream, BenchType.Pipelines, BenchType.Pipelines2)]
     public BenchType Bench { get; set; }
 
     private TestServer _server = new();
 
-    // Инстансы всех реализаций, чтобы не пересоздавать зависимости/конфигурации
-    private readonly IBench _streamBench = new StreamBench();
-    private readonly IBench _bufferedStreamBench = new BufferedStreamBench();
-    private readonly IBench _pipeBench = new PipelinesBench();
-    private readonly IBench _pipe2Bench = new Pipelines2Bench();
 
-    // Активный бенч и поток для текущего прогона
-    private IBench _activeBench;
+    private readonly StreamSendBench _streamBench = new();
+    private readonly BufferedStreamSendBench _bufferedStreamBench = new();
+    private readonly PipelinesSendBench _pipeBench = new();
+    private readonly Pipelines2SendBench _pipe2Bench = new();
+
+    private byte[] _packet;
+    private readonly Random _random = new(40);
+    
+    private ISendBench _activeBench;
     private Stream _stream;
 
     [GlobalSetup]
     public async Task GlobalSetup()
     {
-        // Запускаем сервер один раз перед всеми прогонками
-        await _server.Run(PacketsCount, CompressionThreshold);
+        _packet = new byte[PacketSize];
+        _random.NextBytes(_packet);
+        await _server.Run(PacketsCount, CompressionThreshold, ServerMode.Send);
     }
 
     [IterationSetup]
     public async Task IterationSetup()
     {
-        // Подключаемся (новый TCP соединение для этой итерации)
         _stream = await Connect();
 
-        // Выбираем и настраиваем только нужный бенч
         switch (Bench)
         {
             case BenchType.Stream:
@@ -77,12 +71,13 @@ public class PipelinesBenchmarks
     {
         var client = new TcpClient();
         await client.ConnectAsync("127.0.0.1", 6060);
-        return client.GetStream(); // Закрытие Stream закроет сокет
+        return client.GetStream();
     }
 
     [IterationCleanup]
     public async Task IterationCleanup()
     {
+        
         if (_activeBench != null)
         {
             await _activeBench.Cleanup();
@@ -110,11 +105,11 @@ public class PipelinesBenchmarks
         _server.Stop();
     }
 
-    // единый бенчмарк — BenchmarkDotNet выполнит его для каждого значения Bench
     [Benchmark]
-    public async Task ReadPackets()
+    public async Task SendPackets()
     {
+        
         if (_activeBench == null) throw new InvalidOperationException("Active bench is not configured.");
-        await _activeBench.Run(PacketsCount);
+        await _activeBench.Run(PacketsCount, _packet);
     }
 }

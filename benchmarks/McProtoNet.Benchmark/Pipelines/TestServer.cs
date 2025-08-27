@@ -7,11 +7,18 @@ using System.Threading;
 using System.Threading.Tasks;
 using DotNext.Buffers;
 using DotNext.Diagnostics;
+using DotNext.IO;
 using McProtoNet.Abstractions;
 using McProtoNet.Net;
 using McProtoNet.Serialization;
 
 namespace McProtoNet.Benchmark.Pipelines;
+
+public enum ServerMode
+{
+    Receive,
+    Send
+}
 
 public class TestServer
 {
@@ -33,12 +40,14 @@ public class TestServer
         return writer.GetWrittenMemory();
     }
 
-    private static byte[] bytes;
+    private byte[] bytes;
+
+    private static byte[] ConsumerBuffer = new byte[1024 * 1024];
 
     private TcpListener listener;
     private CancellationTokenSource cts;
 
-    public async Task Run(int packetsCount, int compressionThreshold)
+    public async Task Run(int packetsCount, int compressionThreshold, ServerMode mode)
     {
         cts = new CancellationTokenSource();
         listener = new TcpListener(IPAddress.Any, 6060);
@@ -69,29 +78,49 @@ public class TestServer
                 var socket = await listener.AcceptSocketAsync(CancellationToken.None);
                 await Task.Run(async () =>
                 {
-                    try
+                    if (mode == ServerMode.Receive)
                     {
-                        //Console.WriteLine("Connected");
-                        var time = new Timestamp();
-                        await using var ns = new NetworkStream(socket, true);
-                        await ns.WriteAsync(bytes, CancellationToken.None);
-                        //Console.WriteLine($"Sent Time: {time.Elapsed}");
+                        try
+                        {
+                            await using var ns = new NetworkStream(socket, true);
+                            await ns.WriteAsync(bytes, CancellationToken.None);
+                        }
+                        catch (Exception)
+                        {
+                            // ignored
+                        }
                     }
-                    catch (Exception e)
+                    else
                     {
-                        
-                        //Console.WriteLine(e);
-                    }
-                    finally
-                    {
-                        //Console.WriteLine("Disconnected");
+                        int count = 0;
+                        try
+                        {
+                            await using var ns = new NetworkStream(socket, true);
+                            await using var buffer = new PoolingBufferedStream(ns);
+                            var packetReader = new MinecraftPacketReader
+                            {
+                                BaseStream = buffer
+                            };
+                            packetReader.SwitchCompression(compressionThreshold);
+
+                            while (true)
+                            {
+                                using var p = await packetReader.ReadNextPacketAsync();
+                                count++;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            //Console.WriteLine($"TestServer: {ex}");
+                            // ignored
+                        }
+
+                        if (count != packetsCount)
+                            Environment.FailFast($"TestServer: Packets count mismatch {count} != {packetsCount}");
                     }
                 });
             }
         });
-
-
-        
     }
 
     public void Stop()

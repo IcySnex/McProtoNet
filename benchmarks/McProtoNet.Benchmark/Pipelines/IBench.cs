@@ -8,7 +8,16 @@ public interface IBench
 {
     Task Setup(Stream stream, int compressionThreshold);
     
-    Task Run(int packetsCount);
     
     Task Cleanup();
+}
+
+public interface ISendBench : IBench
+{
+    Task Run(int packetsCount, ReadOnlyMemory<byte> packet);
+}
+
+public interface IReceiveBench : IBench
+{
+    Task Run(int packetsCount);
 }

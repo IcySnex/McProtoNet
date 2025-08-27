@@ -8,7 +8,7 @@ using McProtoNet.Net;
 
 namespace McProtoNet.Benchmark.Pipelines.ReadBenchs;
 
-public class Pipelines2Bench : IBench
+public class Pipelines2ReadBench : IReceiveBench
 {
     private MinecraftPacketPipeReader _reader;
 
@@ -20,6 +20,7 @@ public class Pipelines2Bench : IBench
     public async Task Setup(Stream stream, int compressionThreshold)
     {
         TaskCompletionSource tcs = new();
+        _cts = new CancellationTokenSource();
         _= Task.Run(async () =>
         {
             try
@@ -52,7 +53,7 @@ public class Pipelines2Bench : IBench
             
         });
         _stream = stream;
-        _cts = new CancellationTokenSource();
+        
         _reader = new MinecraftPacketPipeReader(_pipe.Reader)
         {
             CompressionThreshold = compressionThreshold

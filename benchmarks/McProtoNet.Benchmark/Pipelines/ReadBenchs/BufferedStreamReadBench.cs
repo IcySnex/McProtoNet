@@ -1,15 +1,17 @@
 ﻿using System.IO;
 using System.Threading.Tasks;
+using DotNext.IO;
 using McProtoNet.Net;
 
 namespace McProtoNet.Benchmark.Pipelines.ReadBenchs;
 
-public class StreamBench : IBench
+public class BufferedStreamReadBench : IReceiveBench
 {
     private readonly MinecraftPacketReader _reader;
 
     private Stream _stream;
-    public StreamBench()
+
+    public BufferedStreamReadBench()
     {
         _reader = new MinecraftPacketReader();
     }
@@ -18,7 +20,7 @@ public class StreamBench : IBench
     public Task Setup(Stream stream, int compressionThreshold)
     {
         _reader.SwitchCompression(compressionThreshold);
-        _stream = stream;
+        _stream = new PoolingBufferedStream(stream);
         _reader.BaseStream = _stream;
         return Task.CompletedTask;
     }
@@ -36,5 +38,4 @@ public class StreamBench : IBench
         _stream?.Dispose();
         return Task.CompletedTask;
     }
-
 }

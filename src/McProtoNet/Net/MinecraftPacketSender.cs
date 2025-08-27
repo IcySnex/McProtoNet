@@ -15,7 +15,7 @@ public sealed class MinecraftPacketSender
     /// <summary>
     /// VarInt representing zero, used for uncompressed packets
     /// </summary>
-    private static readonly byte[] ZERO_VARINT = { 0 };
+    private static readonly byte[] ZERO_VARINT = [0];
 
     /// <summary>
     /// The compression threshold in bytes. Values less than 0 indicate compression is disabled.
@@ -43,30 +43,29 @@ public sealed class MinecraftPacketSender
 
                 if (uncompressedSize >= _compressionThreshold)
                 {
-                    using var compressedBuffer = Compress(data.Span);
+                    using MemoryOwner<byte> compressedBuffer = Compress(data.Span);
 
-                    var fullSize = compressedBuffer.Length + uncompressedSize.GetVarIntLength();
+                    int fullSize = compressedBuffer.Length + uncompressedSize.GetVarIntLength();
 
                     await BaseStream.WriteVarIntAsync(fullSize, cancellationToken).ConfigureAwait(false);
                     await BaseStream.WriteVarIntAsync(uncompressedSize, cancellationToken).ConfigureAwait(false);
 
                     await BaseStream.WriteAsync(compressedBuffer.Memory, cancellationToken)
                         .ConfigureAwait(false);
-                    
+
                     return;
                 }
 
                 uncompressedSize++;
-                await SendShort(uncompressedSize, data, cancellationToken);
+                await SendShort(uncompressedSize, data, cancellationToken).ConfigureAwait(false);
                 return;
             }
 
-            await SendPacketWithoutCompressionAsync(data, cancellationToken);
-           
+            await SendPacketWithoutCompressionAsync(data, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
-            await BaseStream.FlushAsync(cancellationToken);
+            await BaseStream.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -79,16 +78,9 @@ public sealed class MinecraftPacketSender
     /// <returns>A ValueTask representing the send operation</returns>
     private async ValueTask SendShort(int unSize, ReadOnlyMemory<byte> data, CancellationToken token)
     {
-        try
-        {
-            await BaseStream.WriteVarIntAsync(unSize, token).ConfigureAwait(false);
-            await BaseStream.WriteAsync(ZERO_VARINT, token).ConfigureAwait(false);
-            await BaseStream.WriteAsync(data, token).ConfigureAwait(false);
-        }
-        finally
-        {
-            await BaseStream.FlushAsync(token);
-        }
+        await BaseStream.WriteVarIntAsync(unSize, token).ConfigureAwait(false);
+        await BaseStream.WriteAsync(ZERO_VARINT, token).ConfigureAwait(false);
+        await BaseStream.WriteAsync(data, token).ConfigureAwait(false);
     }
 
 
