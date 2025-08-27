@@ -69,11 +69,11 @@ internal sealed class MinecraftPacketPipeReader
             ReadResult result = default;
             try
             {
-                result = await pipeReader.ReadAsync(cancellationToken);
+                result = await pipeReader.ReadAsync(cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
-                await pipeReader.CompleteAsync();
+                await pipeReader.CompleteAsync().ConfigureAwait(false);
                 break;
             }
 

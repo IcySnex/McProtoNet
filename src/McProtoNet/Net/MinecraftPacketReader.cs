@@ -34,7 +34,7 @@ public sealed class MinecraftPacketReader
     /// <returns>The read packet data</returns>
     /// <exception cref="Exception">Thrown when decompression fails or packet size is invalid</exception>
     [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-    //[AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
+    [AsyncMethodBuilder(typeof(PoolingAsyncValueTaskMethodBuilder<>))]
     public async ValueTask<InputPacket> ReadNextPacketAsync(CancellationToken token = default)
     {
         var len = await BaseStream.ReadVarIntTestAsync(_varIntBuff, token);

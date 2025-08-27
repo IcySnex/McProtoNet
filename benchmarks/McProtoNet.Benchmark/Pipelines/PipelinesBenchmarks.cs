@@ -21,10 +21,9 @@ public enum BenchType
 public class PipelinesBenchmarks
 {
     [Params(1_000_000)] public int PacketsCount;
-    [Params(128)] public int CompressionThreshold;
+    [Params(-1)] public int CompressionThreshold;
 
-    // Выбираем, какой вариант запускать (в отчёте будет указано Bench=...)
-    [Params(BenchType.Stream, BenchType.BufferedStream, BenchType.Pipelines, BenchType.Pipelines2)]
+    [Params(BenchType.BufferedStream, BenchType.Pipelines, BenchType.Pipelines2)]
     public BenchType Bench { get; set; }
 
     private TestServer _server = new();
