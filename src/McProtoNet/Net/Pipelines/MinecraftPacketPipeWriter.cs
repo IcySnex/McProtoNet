@@ -24,7 +24,7 @@ internal sealed class MinecraftPacketPipeWriter
 
     public int CompressionThreshold { get; set; }
 
-    public async ValueTask SendPacketAsync(ReadOnlyMemory<byte> data,
+    public void WritePacket(ReadOnlyMemory<byte> data,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -33,9 +33,11 @@ internal sealed class MinecraftPacketPipeWriter
         {
             pipeWriter.WriteVarInt(data.Length);
             pipeWriter.Write(data.Span);
-            //await pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
             return;
+            //await pipeWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
+            //return ValueTask.CompletedTask;
         }
+        return;
 
         if (data.Length < CompressionThreshold)
         {
@@ -44,7 +46,7 @@ internal sealed class MinecraftPacketPipeWriter
             pipeWriter.WriteVarInt(0);
 
             //await pipeWriter.WriteAsync(data, cancellationToken).ConfigureAwait(false);
-            return;
+            //return ValueTask.CompletedTask;
         }
 
         throw new NotSupportedException();

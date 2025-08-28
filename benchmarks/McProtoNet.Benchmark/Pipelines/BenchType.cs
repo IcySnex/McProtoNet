@@ -5,5 +5,7 @@ public enum BenchType
     Stream,
     BufferedStream,
     Pipelines,
-    Pipelines2
+    Pipelines2,
+    QueueStream,
+    QueuePipe
 }

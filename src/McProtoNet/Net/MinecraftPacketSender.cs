@@ -12,6 +12,8 @@ namespace McProtoNet.Net;
 /// </summary>
 public sealed class MinecraftPacketSender
 {
+    public bool AutoFlush { get; set; } = true;
+
     /// <summary>
     /// VarInt representing zero, used for uncompressed packets
     /// </summary>
@@ -65,7 +67,8 @@ public sealed class MinecraftPacketSender
         }
         finally
         {
-            await BaseStream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            if (AutoFlush)
+                await BaseStream.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -143,4 +146,9 @@ public sealed class MinecraftPacketSender
 
 
     private static readonly MemoryAllocator<byte> _memoryAllocator = ArrayPool<byte>.Shared.ToAllocator();
+
+    public async Task FlushAsync(CancellationToken cancellationToken = default)
+    {
+        await BaseStream.FlushAsync(cancellationToken).ConfigureAwait(false);
+    }
 }

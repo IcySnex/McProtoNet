@@ -37,7 +37,7 @@ internal sealed class PacketPipeHandler : Disposable
     {
         try
         {
-            await writer.SendPacketAsync(data, cancellationToken);
+            //await writer.SendPacketAsync(data, cancellationToken);
         }
         catch (OperationCanceledException)
         {

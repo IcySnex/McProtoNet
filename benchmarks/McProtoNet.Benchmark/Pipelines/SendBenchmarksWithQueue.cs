@@ -3,39 +3,40 @@ using System.IO;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
-using McProtoNet.Benchmark.Pipelines.ReadBenchs;
 using McProtoNet.Benchmark.Pipelines.SendBenchs;
 
 namespace McProtoNet.Benchmark.Pipelines;
 
 [Config(typeof(AntiVirusFriendlyConfig))]
 [MemoryDiagnoser]
-public class PipelinesSendBenchmarks
+public class SendBenchmarksWithQueue
 {
-    [Params(1_000_000)] public int PacketsCount;
+    [Params(50_000, 300_000, 1_000_000)] public int PacketsCount;
     [Params(-1)] public int CompressionThreshold;
     [Params(50)] public int PacketSize;
+
+    [Params(-1, 50, 100, 1000)] public int QueueSize { get; set; }
 
     [Params(BenchType.Pipelines2, BenchType.QueueStream, BenchType.QueuePipe)]
     public BenchType Bench { get; set; }
 
     private TestServer _server = new();
 
-
-    private readonly StreamSendBench _streamBench = new();
-    private readonly BufferedStreamSendBench _bufferedStreamBench = new();
-    private readonly PipelinesSendBench _pipeBench = new();
     private readonly Pipelines2SendBench _pipe2Bench = new();
+    private QueueStreamSendBench _queueStreamBench;
+    private QueuePipeSendBench _queuePipeBench;
 
     private byte[] _packet;
     private readonly Random _random = new(40);
-    
+
     private ISendBench _activeBench;
     private Stream _stream;
 
     [GlobalSetup]
     public async Task GlobalSetup()
     {
+        _queueStreamBench = new(QueueSize);
+        _queuePipeBench = new(QueueSize);
         _packet = new byte[PacketSize];
         _random.NextBytes(_packet);
         await _server.Run(PacketsCount, CompressionThreshold, ServerMode.Send);
@@ -48,17 +49,14 @@ public class PipelinesSendBenchmarks
 
         switch (Bench)
         {
-            case BenchType.Stream:
-                _activeBench = _streamBench;
-                break;
-            case BenchType.BufferedStream:
-                _activeBench = _bufferedStreamBench;
-                break;
-            case BenchType.Pipelines:
-                _activeBench = _pipeBench;
-                break;
             case BenchType.Pipelines2:
                 _activeBench = _pipe2Bench;
+                break;
+            case BenchType.QueueStream:
+                _activeBench = _queueStreamBench;
+                break;
+            case BenchType.QueuePipe:
+                _activeBench = _queuePipeBench;
                 break;
             default:
                 throw new ArgumentOutOfRangeException();
@@ -77,7 +75,6 @@ public class PipelinesSendBenchmarks
     [IterationCleanup]
     public async Task IterationCleanup()
     {
-        
         if (_activeBench != null)
         {
             await _activeBench.Cleanup();
@@ -108,7 +105,6 @@ public class PipelinesSendBenchmarks
     [Benchmark]
     public async Task SendPackets()
     {
-        
         if (_activeBench == null) throw new InvalidOperationException("Active bench is not configured.");
         await _activeBench.Run(PacketsCount, _packet);
     }

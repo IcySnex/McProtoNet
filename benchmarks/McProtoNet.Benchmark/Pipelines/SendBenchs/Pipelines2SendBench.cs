@@ -19,7 +19,7 @@ public class Pipelines2SendBench : ISendBench
     private Pipe _pipe = new();
 
 
-
+    private Task _read;
     
 
     public async Task Setup(Stream stream, int compressionThreshold)
@@ -29,10 +29,6 @@ public class Pipelines2SendBench : ISendBench
         {
             CompressionThreshold = compressionThreshold
         };
-    }
-
-    public async Task Run(int packetsCount, ReadOnlyMemory<byte> packet)
-    {
         var task = Task.Run(async () =>
         {
             var reader = _pipe.Reader;
@@ -78,18 +74,23 @@ public class Pipelines2SendBench : ISendBench
                 await _pipe.Reader.CompleteAsync();
             }
         });
+        _read = task;
+    }
+
+    public async Task Run(int packetsCount, ReadOnlyMemory<byte> packet)
+    {
         for (int i = 0; i < packetsCount; i++)
         {
-            await _writer.SendPacketAsync(packet);
+            _writer.WritePacket(packet);
             await _writer.FlushAsync();
         }
-
         await _pipe.Writer.CompleteAsync();
-        await task;
     }
 
     public async Task Cleanup()
     {
+        await _read;
         _pipe.Reset();
+        _stream?.Dispose();
     }
 }

@@ -27,7 +27,7 @@ public class PipelinesSendBench : ISendBench
     {
         for (int i = 0; i < packetsCount; i++)
         {
-            await _writer.SendPacketAsync(packet);
+            _writer.WritePacket(packet);
             await _writer.FlushAsync();
         }
     }
