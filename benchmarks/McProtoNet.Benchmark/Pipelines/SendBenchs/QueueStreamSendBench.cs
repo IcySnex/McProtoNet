@@ -51,7 +51,7 @@ public class QueueStreamSendBench : ISendBench
                     {
                         count++;
                         await _sender.SendPacketAsync(memory);
-                        if (count == 100)
+                        if (count == 500_000)
                         {
                             count = 0;
                             await _sender.FlushAsync();
@@ -79,12 +79,12 @@ public class QueueStreamSendBench : ISendBench
             await writer.WriteAsync(packet);
         }
         _channel.Writer.Complete();
-        
+        await _read;
     }
 
     public async Task Cleanup()
     {
-        await _read;
+        //await _read;
         _stream?.Dispose();
     }
 }

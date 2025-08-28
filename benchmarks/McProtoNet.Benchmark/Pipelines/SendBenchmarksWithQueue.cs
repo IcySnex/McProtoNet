@@ -11,11 +11,11 @@ namespace McProtoNet.Benchmark.Pipelines;
 [MemoryDiagnoser]
 public class SendBenchmarksWithQueue
 {
-    [Params(50_000, 300_000, 1_000_000)] public int PacketsCount;
+    [Params(1_000_000)] public int PacketsCount;
     [Params(-1)] public int CompressionThreshold;
     [Params(50)] public int PacketSize;
 
-    [Params(-1, 50, 100, 1000)] public int QueueSize { get; set; }
+    [Params(-1, 1000)] public int QueueSize { get; set; }
 
     [Params(BenchType.Pipelines2, BenchType.QueueStream, BenchType.QueuePipe)]
     public BenchType Bench { get; set; }

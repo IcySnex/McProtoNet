@@ -103,7 +103,7 @@ public class QueuePipeSendBench : ISendBench
                     {
                         count++;
                         _writer.WritePacket(memory);
-                        if (count == 100)
+                        if (count == 500_000)
                         {
                             count = 0;
                             var result1 = await _writer.FlushAsync();
@@ -140,6 +140,7 @@ public class QueuePipeSendBench : ISendBench
         }
 
         writer.Complete();
+        await _read;
     }
 
     public async Task Cleanup()
