@@ -18,28 +18,31 @@ public class Pipelines2SendBench : ISendBench
 
     private Pipe _pipe = new();
 
-    private CancellationTokenSource _cts;
 
-    private Task? _gg;
 
     
 
     public async Task Setup(Stream stream, int compressionThreshold)
     {
-        _pipe = new Pipe();
-        _cts = new CancellationTokenSource();
-        TaskCompletionSource tcs = new();
-        _gg = Task.Run(async () =>
+        _stream = stream;
+        _writer = new MinecraftPacketPipeWriter(_pipe.Writer)
+        {
+            CompressionThreshold = compressionThreshold
+        };
+    }
+
+    public async Task Run(int packetsCount, ReadOnlyMemory<byte> packet)
+    {
+        var task = Task.Run(async () =>
         {
             var reader = _pipe.Reader;
-            tcs.TrySetResult();
 
             try
             {
                 while (true)
                 {
                     // Используем токен, чтобы ReadAsync можно было прервать снаружи
-                    ReadResult result = await reader.ReadAsync(_cts.Token);
+                    ReadResult result = await reader.ReadAsync(CancellationToken.None);
                     ReadOnlySequence<byte> buffer = result.Buffer;
 
                     try
@@ -47,7 +50,7 @@ public class Pipelines2SendBench : ISendBench
                         if (!buffer.IsEmpty)
                         {
                             // Пишем в сеть по сегментам — безопасно и без лишних аллокаций
-                            await stream.WriteAsync(buffer);
+                            await _stream.WriteAsync(buffer);
                         }
 
                         if (result.IsCanceled || result.IsCompleted)
@@ -71,73 +74,22 @@ public class Pipelines2SendBench : ISendBench
             }
             finally
             {
-                // Завершение reader'а
-                try
-                {
-                    await _pipe.Reader.CompleteAsync();
-                }
-                catch
-                {
-                }
-
-                //Console.WriteLine("Reader task finished");
+                _pipe.Reader.CancelPendingRead();
+                await _pipe.Reader.CompleteAsync();
             }
         });
-
-        // сохраняем stream и writer
-        _stream = stream;
-        _writer = new MinecraftPacketPipeWriter(_pipe.Writer)
-        {
-            CompressionThreshold = compressionThreshold
-        };
-
-        // Ждём, пока он стартует
-        await tcs.Task.ConfigureAwait(false);
-    }
-
-    public async Task Run(int packetsCount, ReadOnlyMemory<byte> packet)
-    {
         for (int i = 0; i < packetsCount; i++)
         {
             await _writer.SendPacketAsync(packet);
             await _writer.FlushAsync();
         }
+
+        await _pipe.Writer.CompleteAsync();
+        await task;
     }
 
     public async Task Cleanup()
     {
-        try
-        {
-            // 1) Сигналим отмену выполнения (ReadAsync будет выброшен OperationCanceledException)
-            _cts.Cancel();
-
-            // 2) Просим писатель/читатель завершиться корректно
-            await _pipe.Writer.CompleteAsync().ConfigureAwait(false);
-            _pipe.Reader.CancelPendingRead();
-
-            // 3) Дождаться фоновой задачи (которая уже получила отмену и завершит loop)
-            if (_gg is not null)
-                await _gg.ConfigureAwait(false);
-
-            // 4) Завершаем reader на всякий случай
-            await _pipe.Reader.CompleteAsync().ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine("Cleanup exception: " + ex);
-        }
-        finally
-        {
-            _cts.Dispose();
-            _gg = null;
-
-            if (_stream is not null)
-            {
-                await _stream.DisposeAsync().ConfigureAwait(false);
-                _stream = null;
-            }
-
-            _pipe.Reset();
-        }
+        _pipe.Reset();
     }
 }

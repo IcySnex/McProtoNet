@@ -1,6 +1,7 @@
 ﻿using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using DotNext.Buffers;
 
 namespace McProtoNet.Serialization;
 
@@ -71,11 +72,9 @@ public static class Extensions
         }
 
 
-        Span<byte> data = stackalloc byte[5];
-
-        var len = value.GetVarIntLength(data);
-
-        writer.Write(data[..len]);
+        var span = writer.GetSpan(5);
+        var len = value.GetVarIntLength(span);
+        writer.Advance(len);
     }
 
 

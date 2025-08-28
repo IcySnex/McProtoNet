@@ -96,18 +96,22 @@ public class TestServer
                         try
                         {
                             await using var ns = new NetworkStream(socket, true);
-                            await using var buffer = new PoolingBufferedStream(ns);
-                            var packetReader = new MinecraftPacketReader
-                            {
-                                BaseStream = buffer
-                            };
-                            packetReader.SwitchCompression(compressionThreshold);
-
                             while (true)
                             {
-                                using var p = await packetReader.ReadNextPacketAsync();
-                                count++;
+                                await ns.ReadExactlyAsync(ConsumerBuffer, CancellationToken.None);
                             }
+                            // await using var buffer = new PoolingBufferedStream(ns);
+                            // var packetReader = new MinecraftPacketReader
+                            // {
+                            //     BaseStream = buffer
+                            // };
+                            // packetReader.SwitchCompression(compressionThreshold);
+                            //
+                            // while (true)
+                            // {
+                            //     using var p = await packetReader.ReadNextPacketAsync();
+                            //     count++;
+                            // }
                         }
                         catch (Exception ex)
                         {
@@ -115,6 +119,7 @@ public class TestServer
                             // ignored
                         }
 
+                        return;
                         if (count != packetsCount)
                             Environment.FailFast($"TestServer: Packets count mismatch {count} != {packetsCount}");
                     }

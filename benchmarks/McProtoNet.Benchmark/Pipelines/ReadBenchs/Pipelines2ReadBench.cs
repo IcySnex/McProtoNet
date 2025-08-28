@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Pipelines;
 using System.Threading;
 using System.Threading.Tasks;
+using DotNext.IO.Pipelines;
 using McProtoNet.Net;
 
 namespace McProtoNet.Benchmark.Pipelines.ReadBenchs;
@@ -27,6 +28,7 @@ public class Pipelines2ReadBench : IReceiveBench
             {
                 var writer = _pipe.Writer;
                 tcs.SetResult();
+                
                 while (!_cts.IsCancellationRequested)
                 {
                     var memory = writer.GetMemory();

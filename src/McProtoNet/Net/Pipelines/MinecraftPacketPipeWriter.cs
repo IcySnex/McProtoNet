@@ -1,6 +1,7 @@
 ﻿using System.Buffers;
 using System.IO.Pipelines;
 using System.Security.Cryptography;
+using DotNext.Buffers;
 using McProtoNet.Net.Zlib;
 using McProtoNet.Serialization;
 
@@ -38,6 +39,7 @@ internal sealed class MinecraftPacketPipeWriter
 
         if (data.Length < CompressionThreshold)
         {
+            
             pipeWriter.WriteVarInt(data.Length + 1);
             pipeWriter.WriteVarInt(0);
 

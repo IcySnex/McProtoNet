@@ -16,7 +16,7 @@ public class PipelinesSendBenchmarks
     [Params(-1)] public int CompressionThreshold;
     [Params(50)] public int PacketSize;
 
-    [Params(BenchType.BufferedStream, BenchType.Pipelines, BenchType.Pipelines2)]
+    [Params(BenchType.Pipelines2)]
     public BenchType Bench { get; set; }
 
     private TestServer _server = new();
