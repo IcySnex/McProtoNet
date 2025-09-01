@@ -73,6 +73,7 @@ internal sealed class MinecraftPacketPipeReader
             }
             catch (OperationCanceledException)
             {
+                
                 await pipeReader.CompleteAsync().ConfigureAwait(false);
                 break;
             }
@@ -100,46 +101,7 @@ internal sealed class MinecraftPacketPipeReader
         await pipeReader.CompleteAsync().ConfigureAwait(false);
     }
 
-    public static Memory<byte> DecryptAES(ReadOnlySequence<byte> buffer, ICryptoTransform decryptor)
-    {
-        // Вычисляем длину данных
-        long totalLength = buffer.Length;
-
-        if (totalLength == 0)
-            return Memory<byte>.Empty;
-
-        // Резервируем буфер для расшифрованных данных
-        byte[] output = ArrayPool<byte>.Shared.Rent((int)totalLength);
-
-        int offset = 0;
-
-        foreach (var segment in buffer)
-        {
-            // TransformBlock работает с массивами
-            offset += decryptor.TransformBlock(
-                segment.Span.ToArray(), // временно создаём массив из сегмента
-                0,
-                segment.Span.Length,
-                output,
-                offset
-            );
-        }
-
-        // В случае последнего блока (TransformFinalBlock) — вызываем отдельно
-        // Для пайплайнов обычно весь блок можно считать финальным
-        byte[] final = decryptor.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-
-        if (final.Length > 0)
-        {
-            Array.Copy(final, 0, output, offset, final.Length);
-            offset += final.Length;
-        }
-
-        // Создаём Memory<byte> только на реально расшифрованные данные
-        var result = new Memory<byte>(output, 0, offset);
-
-        return result;
-    }
+    
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool TryReadPacket(ref ReadOnlySequence<byte> buffer, out ReadOnlySequence<byte> packet)
