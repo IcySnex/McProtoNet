@@ -3,14 +3,31 @@ using System.IO;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Configs;
+using BenchmarkDotNet.Environments;
+using BenchmarkDotNet.Jobs;
+using BenchmarkDotNet.Toolchains.InProcess.NoEmit;
 using McProtoNet.Benchmark.Pipelines.ReadBenchs;
 
 namespace McProtoNet.Benchmark.Pipelines;
 
-[Config(typeof(AntiVirusFriendlyConfig))]
+[Config(typeof(ConfigWithCustomEnvVars))]
 [MemoryDiagnoser]
 public class PipelinesReadBenchmarks
 {
+    private class ConfigWithCustomEnvVars : ManualConfig
+    {
+        public ConfigWithCustomEnvVars()
+        {
+            AddJob(Job.Default.WithRuntime(CoreRuntime.Core10_0)
+                .WithEnvironmentVariables(
+                    new EnvironmentVariable("DOTNET_RuntimeAsync", "true")
+                )
+                .WithToolchain(InProcessNoEmitToolchain.Instance)
+                .WithId("RuntimeAsync"));
+        }
+    }
+    
     [Params(1_000_000)] public int PacketsCount;
     [Params(-1)] public int CompressionThreshold;
 

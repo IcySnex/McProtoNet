@@ -16,10 +16,11 @@ public class Pipelines2SendBench : ISendBench
 
     private Stream _stream;
 
-    private Pipe _pipe = new();
+    private readonly Pipe _pipe = new(new PipeOptions(
+        useSynchronizationContext: true));
 
 
-    private Task _read;
+    private Task _task;
     
 
     public async Task Setup(Stream stream, int compressionThreshold)
@@ -29,52 +30,52 @@ public class Pipelines2SendBench : ISendBench
         {
             CompressionThreshold = compressionThreshold
         };
-        var task = Task.Run(async () =>
+        _task = RunWriter();
+    }
+
+    private async Task RunWriter()
+    {
+        var reader = _pipe.Reader;
+
+        try
         {
-            var reader = _pipe.Reader;
-
-            try
+            while (true)
             {
-                while (true)
+                // Используем токен, чтобы ReadAsync можно было прервать снаружи
+                ReadResult result = await reader.ReadAsync(CancellationToken.None).ConfigureAwait(false);
+                ReadOnlySequence<byte> buffer = result.Buffer;
+
+                try
                 {
-                    // Используем токен, чтобы ReadAsync можно было прервать снаружи
-                    ReadResult result = await reader.ReadAsync(CancellationToken.None);
-                    ReadOnlySequence<byte> buffer = result.Buffer;
-
-                    try
+                    if (!buffer.IsEmpty)
                     {
-                        if (!buffer.IsEmpty)
-                        {
-                            // Пишем в сеть по сегментам — безопасно и без лишних аллокаций
-                            await _stream.WriteAsync(buffer);
-                        }
+                        // Пишем в сеть по сегментам — безопасно и без лишних аллокаций
+                        await _stream.WriteAsync(buffer).ConfigureAwait(false);
+                    }
 
-                        if (result.IsCanceled || result.IsCompleted)
-                            break;
-                    }
-                    finally
-                    {
-                        // Если пусто — AdvanceTo(start), иначе AdvanceTo(end)
-                        reader.AdvanceTo(buffer.IsEmpty ? buffer.Start : buffer.End);
-                    }
+                    if (result.IsCanceled || result.IsCompleted)
+                        break;
+                }
+                finally
+                {
+                    // Если пусто — AdvanceTo(start), иначе AdvanceTo(end)
+                    reader.AdvanceTo(buffer.IsEmpty ? buffer.Start : buffer.End);
                 }
             }
-            catch (OperationCanceledException)
-            {
-                /* ожидаемо при Cancel */
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Reader loop exception: " + ex);
-                Environment.FailFast("Reader loop error");
-            }
-            finally
-            {
-                _pipe.Reader.CancelPendingRead();
-                await _pipe.Reader.CompleteAsync();
-            }
-        });
-        _read = task;
+        }
+        catch (OperationCanceledException)
+        {
+            /* ожидаемо при Cancel */
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Reader loop exception: " + ex);
+            Environment.FailFast("Reader loop error");
+        }
+        finally
+        {
+            
+        }
     }
 
     public async Task Run(int packetsCount, ReadOnlyMemory<byte> packet)
@@ -89,7 +90,9 @@ public class Pipelines2SendBench : ISendBench
 
     public async Task Cleanup()
     {
-        await _read;
+        await _task;
+        _pipe.Reader.CancelPendingRead();
+        await _pipe.Reader.CompleteAsync().ConfigureAwait(false);
         _pipe.Reset();
         _stream?.Dispose();
     }

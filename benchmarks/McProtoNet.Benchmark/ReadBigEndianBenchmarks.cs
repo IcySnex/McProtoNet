@@ -52,7 +52,7 @@ public class ReadBigEndianBenchmarks
     [Benchmark]
     public long[] SimdRead()
     {
-        Span<long> numbers = MemoryMarshal.Cast<byte, long>(TestArr);
+        ReadOnlySpan<long> numbers = MemoryMarshal.Cast<byte, long>(TestArr);
 
         //if (BitConverter.IsLittleEndian)
         {

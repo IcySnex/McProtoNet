@@ -16,7 +16,7 @@ public class PipelinesSendBenchmarks
     [Params(-1)] public int CompressionThreshold;
     [Params(50)] public int PacketSize;
 
-    [Params(BenchType.Pipelines2, BenchType.QueueStream, BenchType.QueuePipe)]
+    [Params( BenchType.Pipelines2)]
     public BenchType Bench { get; set; }
 
     private TestServer _server = new();
@@ -29,7 +29,7 @@ public class PipelinesSendBenchmarks
 
     private byte[] _packet;
     private readonly Random _random = new(40);
-    
+
     private ISendBench _activeBench;
     private Stream _stream;
 
@@ -77,7 +77,6 @@ public class PipelinesSendBenchmarks
     [IterationCleanup]
     public async Task IterationCleanup()
     {
-        
         if (_activeBench != null)
         {
             await _activeBench.Cleanup();
@@ -108,7 +107,6 @@ public class PipelinesSendBenchmarks
     [Benchmark]
     public async Task SendPackets()
     {
-        
         if (_activeBench == null) throw new InvalidOperationException("Active bench is not configured.");
         await _activeBench.Run(PacketsCount, _packet);
     }
