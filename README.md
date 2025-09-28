@@ -58,3 +58,6 @@ You can support development by donating cryptocurrency:
 **USDT (TRC20)**: `TKbnv1CkfQs1UBSoJVbwuqPAhaHDiy7Vbm`
 
 **BTC**: `bc1qgx4glhjhjyw7sz2qt5mhyg40cspgp8lanpl282`
+
+**ETH**: `0xc657D636f22701E0B4D20B098DFd123450D89518`
+
