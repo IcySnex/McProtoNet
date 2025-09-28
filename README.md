@@ -46,4 +46,15 @@ McProtoNet is currently under active development, so some features are not stabl
         <img valign="middle" src="assets/cracked.svg" alt="Icon 3" style="width: 25px; vertical-align: middle; margin-right: 8px;">
         <strong valign="middle" style="vertical-align: middle">Connect to cracked servers</strong>
     </li>
+
 </ul>
+
+## 💸 Support the project
+
+You can support development by donating cryptocurrency:
+
+**USDT (TON)**: `UQB5OyxViBHENXXKPpIZdAXJmrmmqn599_aNkYeRe9HqXY4Q`
+
+**USDT (TRC20)**: `TKbnv1CkfQs1UBSoJVbwuqPAhaHDiy7Vbm`
+
+**BTC**: `bc1qgx4glhjhjyw7sz2qt5mhyg40cspgp8lanpl282`
