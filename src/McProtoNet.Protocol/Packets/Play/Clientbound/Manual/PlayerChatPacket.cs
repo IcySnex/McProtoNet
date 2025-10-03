@@ -126,8 +126,6 @@ namespace McProtoNet.Protocol.Packets.Play.Clientbound
             public int FilterType { get; set; }
             public long[]? FilterTypeMask { get; set; }
             public int Type { get; set; }
-            public NbtTag NetworkName { get; set; }
-            public NbtTag? NetworkTargetName { get; set; }
 
             public override void Deserialize(ref MinecraftPrimitiveReader reader, int protocolVersion)
             {
@@ -144,8 +142,6 @@ namespace McProtoNet.Protocol.Packets.Play.Clientbound
                 if (FilterType == 2)
                     FilterTypeMask = reader.ReadArray<long, LongArrayReader>(LengthFormat.VarInt);
                 Type = reader.ReadVarInt();
-                NetworkName = reader.ReadNbtTag(protocolVersion);
-                NetworkTargetName = reader.ReadOptionalNbtTag(protocolVersion);
             }
         }
 
@@ -162,9 +158,6 @@ namespace McProtoNet.Protocol.Packets.Play.Clientbound
             public NbtTag? UnsignedChatContent { get; set; }
             public int FilterType { get; set; }
             public long[]? FilterTypeMask { get; set; }
-            public ChatTypes Type { get; set; }
-            public NbtTag NetworkName { get; set; }
-            public NbtTag? NetworkTargetName { get; set; }
 
             public override void Deserialize(ref MinecraftPrimitiveReader reader, int protocolVersion)
             {
@@ -180,58 +173,9 @@ namespace McProtoNet.Protocol.Packets.Play.Clientbound
                 FilterType = reader.ReadVarInt();
                 if (FilterType == 2)
                     FilterTypeMask = reader.ReadArray<long, LongArrayReader>(LengthFormat.VarInt);
-                Type = ChatTypes.Read(ref reader, protocolVersion);
-                NetworkName = reader.ReadNbtTag(protocolVersion);
-                NetworkTargetName = reader.ReadOptionalNbtTag(protocolVersion);
             }
         }
 
         public abstract void Deserialize(ref MinecraftPrimitiveReader reader, int protocolVersion);
-
-
-        public class ChatTypes
-        {
-            public int RegistryIndex { get; set; }
-            public ChatType? Chat { get; set; }
-            public ChatType? Narration { get; set; }
-
-            public static ChatTypes Read(ref MinecraftPrimitiveReader reader, int protocolVersion)
-            {
-                if (protocolVersion is >= 767 and <= 769)
-                {
-                    return new ChatTypes
-                    {
-                        RegistryIndex = reader.ReadVarInt(),
-
-                        Chat = ChatType.Read(ref reader, protocolVersion),
-                        Narration = ChatType.Read(ref reader, protocolVersion)
-                    };
-                }
-
-                throw new InvalidOperationException("Invalid protocol version");
-            }
-        }
-
-        public class ChatType
-        {
-            public string TranslationKey { get; set; }
-            public int[] Parameters { get; set; }
-            public NbtTag Style { get; set; }
-
-            public static ChatType Read(ref MinecraftPrimitiveReader reader, int protocolVersion)
-            {
-                if (protocolVersion is >= 767 and <= 769)
-                {
-                    return new ChatType
-                    {
-                        TranslationKey = reader.ReadString(),
-                        Parameters = reader.ReadArray<int, VarIntArrayReader>(LengthFormat.VarInt),
-                        Style = reader.ReadNbtTag(protocolVersion)
-                    };
-                }
-
-                throw new InvalidOperationException("Invalid protocol version");
-            }
-        }
     }
 }
