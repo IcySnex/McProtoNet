@@ -215,10 +215,25 @@ public static class Extensions
 
     public static Slot? ReadSlot(this ref MinecraftPrimitiveReader reader, int protocolVersion)
     {
-        if (reader.ReadBoolean())
-            return new Slot(reader.ReadVarInt(), reader.ReadSignedByte(),
-                reader.ReadNbtTag(protocolVersion));
+        if (!reader.ReadBoolean())
+            return null;
 
-        return null;
+        int id = reader.ReadVarInt();
+        sbyte count = reader.ReadSignedByte();
+
+        NbtTag? nbt = null;
+        try
+        {
+            nbt = reader.ReadNbtTag(protocolVersion);
+        }
+        catch
+        { }
+
+        return new()
+        {
+            ItemId = id,
+            ItemCount = count,
+            Nbt = nbt
+        };
     }
 }
