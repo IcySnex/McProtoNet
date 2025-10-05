@@ -178,8 +178,10 @@ public static class Extensions
             writer.WriteFloat(rotation.X);
             writer.WriteFloat(rotation.Y);
         }
-
-        throw new InvalidOperationException("Protocol version not supported");
+        else
+        {
+            throw new InvalidOperationException("Protocol version not supported");
+        }
     }
 
     public static void WriteVector3F64(this scoped ref MinecraftPrimitiveWriter writer, Vector3F64 rotation,
